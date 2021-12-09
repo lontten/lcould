@@ -15,41 +15,6 @@ type FileSync struct {
 	Fi      Finfo
 }
 
-//
-//func dirLd(vfd *HashStore, path string, updPath []string) error {
-//	dir, err := os.ReadDir(path)
-//	if err != nil {
-//		return err
-//	}
-//
-//	dirs := vfd.Dir
-//	vfiles := vfd.Files
-//
-//	for _, entry := range dir {
-//		fileName := path + string(os.PathSeparator) + entry.Name()
-//
-//		if entry.IsDir() {
-//			dirs = append(dirs, fileName)
-//			continue
-//		}
-//		info, err := entry.Info()
-//		if err != nil {
-//			return err
-//		}
-//		modTime := info.ModTime()
-//		code := utils.GetFileSHA256HashCode(fileName)
-//		fInfo := Finfo{
-//			Path:    fileName,
-//			ModTime: modTime,
-//		}
-//		addFile(&vfiles, code, fInfo)
-//	}
-//
-//	ld.Dir = dirs
-//	ld.Files = vfiles
-//	return
-//}
-
 //遍历文件夹，获取文件信息，生成 HashStore，PathStore
 func mapLocalDir(path string, updPath []string) error {
 	dir, err := os.ReadDir(path)
