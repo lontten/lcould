@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/lontten/lcloud/utils"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -49,6 +50,7 @@ type FileSync struct {
 //	return
 //}
 
+//遍历文件夹，获取文件信息，生成 HashStore，PathStore
 func mapLocalDir(path string, updPath []string) error {
 	dir, err := os.ReadDir(path)
 	if err != nil {
@@ -59,7 +61,7 @@ func mapLocalDir(path string, updPath []string) error {
 	files := make([]string, 0)
 
 	for _, entry := range dir {
-		fileName := path + string(os.PathSeparator) + entry.Name()
+		fileName := filepath.Join(path, entry.Name())
 		if entry.IsDir() {
 			dirs = append(dirs, fileName)
 		} else {
@@ -99,6 +101,7 @@ func mapLocalDir(path string, updPath []string) error {
 //有相同的直接返回fals，没有添加后，返回true
 func addFile(code string, fInfo Finfo) bool {
 	for i, store := range HashStores {
+		//已存在相同的指纹，添加进数组
 		if store.Hash256 == code {
 			for _, finfo := range store.FiArr {
 				if finfo.Path == fInfo.Path {
@@ -108,12 +111,9 @@ func addFile(code string, fInfo Finfo) bool {
 			HashStores[i].FiArr = append(store.FiArr, fInfo)
 			return true
 		}
-		fis := make([]Finfo, 1)
-		fis[0] = fInfo
-		hf := HashStore{Hash256: code, FiArr: fis}
-		HashStores = append(HashStores, hf)
-		return true
 	}
+
+	//未存在相同的指纹，直接创建
 	fis := make([]Finfo, 1)
 	fis[0] = fInfo
 	hf := HashStore{Hash256: code, FiArr: fis}
