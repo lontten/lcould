@@ -2,98 +2,102 @@ package main
 
 import (
 	"fmt"
+	"github.com/lontten/lcloud/model"
 	"github.com/lontten/lcloud/utils"
 	"os"
 	"path/filepath"
 )
 
-//处理del
-func sFolder(arr []FileModDto) {
-
-}
-
 func main() {
-	add, del, err := mapLocalDir("/Users/lontten/")
-	sFolder(add)
+	e, err := checkFileModEvent("/Users/lontten/")
 
+	fmt.Println(e)
 	fmt.Println(err)
 
 }
 
-//文件同步对比
-type FileSync struct {
-	Hash256 string
-	Fi      Finfo
-}
+//遍历文件夹，获取文件信息，生成 file 变化event
+func checkFileModEvent(path string) (model.SyncEvent, error) {
+	e := model.SyncEvent{}
 
-//遍历文件夹，获取文件信息，生成 HashStore，FolderStore
-func mapLocalDir(path string) (add, del []FileModDto, err error) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
-		return nil, nil, err
+		return e, err
 	}
 
 	currentFileFlags := make(map[string]bool)
-	currentFolerFlags := make(map[string]bool)
+	currentDirFlags := make(map[string]bool)
+	currentPathFileStores := make(map[string]model.FileDto)
 
 	for _, entry := range dir {
 		filePath := filepath.Join(path, entry.Name())
 		if entry.IsDir() { //文件夹
-			currentFolerFlags[filePath] = false //保存当前的文件夹列表
 
-			_, ok := FolderStores[filePath]
+			currentDirFlags[filePath] = false //保存当前的文件夹列表
+			_, ok := model.DirHasCheck[filePath]
 			if ok {
 				//文件夹已经存在,标记为true
-				FolderFlags[filePath] = true
-			} else {
-				//文件夹不存在，添加到add列表
-				add = append(add, FileModDto{
-					Path: filePath,
-				})
+				model.DirHasCheck[filePath] = true
+				continue
 			}
-		} else { //文件
-			currentFileFlags[filePath] = false //保存当前的文件列表
 
-			info, err := entry.Info()
-			if err != nil {
-				return nil, nil, err
-			}
-			modTime := info.ModTime()
-			_, ok := FileStorss[Finfo{
-				Path:    filePath,
-				ModTime: modTime,
-			}]
-			if ok {
-				//文件已经存在，标记为true
-				FileFlags[filePath] = true
-			} else {
-				//文件不存在，添加到add列表
-				add = append(add, FileModDto{
-					Path: filePath,
-					Hash: utils.GetFileSHA256HashCode(filePath),
-				})
-
-			}
+			//文件夹不存在，添加到add列表
+			e.PushAddDirEvent(filePath)
+			continue
 		}
+
+		//------------------文件-------------------
+		info, err := entry.Info()
+		if err != nil {
+			return e, err
+		}
+		modTime := info.ModTime()
+
+		currentFileFlags[filePath] = false //保存当前的文件列表
+		currentPathFileStores[filePath] = model.FileDto{
+			Path:    filePath,
+			ModTime: modTime,
+		}
+
+		_, ok := model.FileHasCheck[filePath]
+		if ok {
+			//文件夹已经存在,标记为true
+			model.FileHasCheck[filePath] = true
+			continue
+		}
+
+		_, ok = model.FileTimeHasCheck[model.FileDto{
+			Path:    filePath,
+			ModTime: modTime,
+		}]
+		if ok {
+			//文件已经存在，标记为true
+			model.FileHasCheck[filePath] = true
+			continue
+		}
+		//文件不存在，添加到add列表
+		e.PushAddFileEvent(model.FileHashDto{
+			Path:    filePath,
+			ModTime: modTime,
+			Hash:    utils.GetFileSHA256HashCode(filePath),
+		})
 	}
 
-	for s, b := range FolderFlags {
+	for s, b := range model.FileHasCheck {
 		if !b {
-			del = append(del, FileModDto{
-				Path: s,
-				Hash: "folder",
-			})
+			e.PushDelFileEvent(model.FilePathInfos[s])
 		}
 	}
 
-	for s, b := range FolderFlags {
+	for s, b := range model.DirHasCheck {
 		if !b {
-			del = append(del, FileModDto{
-				Path: s,
-				Hash: "",
-			})
+			e.PushDelDirEvent(s)
 		}
 	}
 
-	return
+	model.FileHasCheck = currentFileFlags
+	model.DirHasCheck = currentDirFlags
+	model.FilePathInfos = currentPathFileStores
+
+	return e, nil
 }
