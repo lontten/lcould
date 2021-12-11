@@ -3,6 +3,7 @@ HELP.md
 build/
 /logs/
 *.exe
+go.sum
 
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/

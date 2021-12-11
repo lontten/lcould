@@ -1,12 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"github.com/lontten/lcloud/utils"
 	"os"
 	"path/filepath"
 )
 
+//处理del
+func sFolder(arr []FileModDto) {
+
+}
+
 func main() {
+	add, del, err := mapLocalDir("/Users/lontten/")
+	sFolder(add)
+
+	fmt.Println(err)
+
 }
 
 //文件同步对比
@@ -15,73 +26,74 @@ type FileSync struct {
 	Fi      Finfo
 }
 
-//遍历文件夹，获取文件信息，生成 HashStore，PathStore
-func mapLocalDir(path string, updPath []string) error {
+//遍历文件夹，获取文件信息，生成 HashStore，FolderStore
+func mapLocalDir(path string) (add, del []FileModDto, err error) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	dirs := make([]string, 0)
-	files := make([]string, 0)
+	currentFileFlags := make(map[string]bool)
+	currentFolerFlags := make(map[string]bool)
 
 	for _, entry := range dir {
-		fileName := filepath.Join(path, entry.Name())
-		if entry.IsDir() {
-			dirs = append(dirs, fileName)
-		} else {
-			files = append(files, fileName)
+		filePath := filepath.Join(path, entry.Name())
+		if entry.IsDir() { //文件夹
+			currentFolerFlags[filePath] = false //保存当前的文件夹列表
+
+			_, ok := FolderStores[filePath]
+			if ok {
+				//文件夹已经存在,标记为true
+				FolderFlags[filePath] = true
+			} else {
+				//文件夹不存在，添加到add列表
+				add = append(add, FileModDto{
+					Path: filePath,
+				})
+			}
+		} else { //文件
+			currentFileFlags[filePath] = false //保存当前的文件列表
 
 			info, err := entry.Info()
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 			modTime := info.ModTime()
-			code := utils.GetFileSHA256HashCode(fileName)
-			fInfo := Finfo{
-				Path:    fileName,
+			_, ok := FileStorss[Finfo{
+				Path:    filePath,
 				ModTime: modTime,
+			}]
+			if ok {
+				//文件已经存在，标记为true
+				FileFlags[filePath] = true
+			} else {
+				//文件不存在，添加到add列表
+				add = append(add, FileModDto{
+					Path: filePath,
+					Hash: utils.GetFileSHA256HashCode(filePath),
+				})
+
 			}
-			addFile(code, fInfo)
 		}
 	}
 
-	for i, pathStore := range PathStores {
-		if pathStore.Path == path {
-			PathStores[i].DirPath = dirs
-			PathStores[i].FilePath = files
-			return nil
-		}
-	}
-	//没有匹配到路径，添加
-	store := PathStore{
-		Path:     path,
-		FilePath: files,
-		DirPath:  dirs,
-	}
-	PathStores = append(PathStores, store)
-	return nil
-}
-
-//有相同的直接返回fals，没有添加后，返回true
-func addFile(code string, fInfo Finfo) bool {
-	for i, store := range HashStores {
-		//已存在相同的指纹，添加进数组
-		if store.Hash256 == code {
-			for _, finfo := range store.FiArr {
-				if finfo.Path == fInfo.Path {
-					return false
-				}
-			}
-			HashStores[i].FiArr = append(store.FiArr, fInfo)
-			return true
+	for s, b := range FolderFlags {
+		if !b {
+			del = append(del, FileModDto{
+				Path: s,
+				Hash: "folder",
+			})
 		}
 	}
 
-	//未存在相同的指纹，直接创建
-	fis := make([]Finfo, 1)
-	fis[0] = fInfo
-	hf := HashStore{Hash256: code, FiArr: fis}
-	HashStores = append(HashStores, hf)
-	return true
+	for s, b := range FolderFlags {
+		if !b {
+			del = append(del, FileModDto{
+				Path: s,
+				Hash: "",
+			})
+		}
+	}
+
+	return
 }
