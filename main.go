@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	e, err := checkFileModEvent("/Users/lontten/")
+	e, err := checkFileModEvent("/Users/lontten/kk/")
 
 	fmt.Println(e)
 	fmt.Println(err)
@@ -18,22 +18,23 @@ func main() {
 
 //遍历文件夹，获取文件信息，生成 file 变化event
 func checkFileModEvent(path string) (model.SyncEvent, error) {
-	e := model.SyncEvent{}
+	e := model.NewSyncEvent()
 
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		return e, err
 	}
 
-	currentFileFlags := make(map[string]bool)
-	currentDirFlags := make(map[string]bool)
-	currentPathFileStores := make(map[string]model.FileDto)
+	currentFileHashCheck := make(map[string]bool)
+	currentDirHasCheck := make(map[string]bool)
+	currentFilePathInfos := make(map[string]model.FileHashDto)
+	currentFileTimeHasCheck := make(map[model.FileDto]string)
 
 	for _, entry := range dir {
 		filePath := filepath.Join(path, entry.Name())
 		if entry.IsDir() { //文件夹
 
-			currentDirFlags[filePath] = false //保存当前的文件夹列表
+			currentDirHasCheck[filePath] = false //保存当前的文件夹列表
 			_, ok := model.DirHasCheck[filePath]
 			if ok {
 				//文件夹已经存在,标记为true
@@ -53,39 +54,54 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		}
 		modTime := info.ModTime()
 
-		currentFileFlags[filePath] = false //保存当前的文件列表
-		currentPathFileStores[filePath] = model.FileDto{
-			Path:    filePath,
-			ModTime: modTime,
-		}
+		currentFileHashCheck[filePath] = false //保存当前的文件列表
 
 		_, ok := model.FileHasCheck[filePath]
 		if ok {
 			//文件夹已经存在,标记为true
 			model.FileHasCheck[filePath] = true
-			continue
 		}
 
-		_, ok = model.FileTimeHasCheck[model.FileDto{
+		fileDto := model.FileDto{
 			Path:    filePath,
 			ModTime: modTime,
-		}]
+		}
+		hash, ok := model.FileTimeHasCheck[fileDto]
 		if ok {
 			//文件已经存在，标记为true
 			model.FileHasCheck[filePath] = true
+
+			currentFilePathInfos[filePath] = model.FileHashDto{
+				Path:    filePath,
+				Hash:    hash,
+				ModTime: modTime,
+			}
+			currentFileTimeHasCheck[fileDto] = hash
+
 			continue
 		}
+
+		hash = utils.GetFileSHA256HashCode(filePath)
 		//文件不存在，添加到add列表
-		e.PushAddFileEvent(model.FileHashDto{
-			Path:    filePath,
-			ModTime: modTime,
-			Hash:    utils.GetFileSHA256HashCode(filePath),
+		e.PushAddFileEvent(model.HashDto{
+			Path: filePath,
+			Hash: hash,
 		})
+
+		currentFilePathInfos[filePath] = model.FileHashDto{
+			Path:    filePath,
+			Hash:    hash,
+			ModTime: modTime,
+		}
+		currentFileTimeHasCheck[fileDto] = hash
 	}
 
 	for s, b := range model.FileHasCheck {
 		if !b {
-			e.PushDelFileEvent(model.FilePathInfos[s])
+			e.PushDelFileEvent(model.HashDto{
+				Path: s,
+				Hash: model.FilePathInfos[s].Hash,
+			})
 		}
 	}
 
@@ -95,9 +111,10 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		}
 	}
 
-	model.FileHasCheck = currentFileFlags
-	model.DirHasCheck = currentDirFlags
-	model.FilePathInfos = currentPathFileStores
+	model.FileHasCheck = currentFileHashCheck
+	model.DirHasCheck = currentDirHasCheck
+	model.FilePathInfos = currentFilePathInfos
+	model.FileTimeHasCheck = currentFileTimeHasCheck
 
 	return e, nil
 }

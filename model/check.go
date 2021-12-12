@@ -1,5 +1,7 @@
 package model
 
+//用于本地检查文件变化
+
 //用户记录文件现在没有，就被删除了
 //记录上一次的文件列表，用于下次，找出删除的文件路径，和新增的文件夹路径
 var (
@@ -17,4 +19,5 @@ var (
 var FileTimeHasCheck = make(map[FileDto]string)
 
 //-------------------file-------------
-var FilePathInfos = make(map[string]FileDto)
+//string 文件路径 》文件信息
+var FilePathInfos = make(map[string]FileHashDto)
