@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/lontten/lcloud/model"
+	"github.com/lontten/lcloud/store"
 	"github.com/lontten/lcloud/utils"
 	"os"
 	"path/filepath"
@@ -19,6 +20,9 @@ func main() {
 //遍历文件夹，获取文件信息，生成 file 变化event
 func checkFileModEvent(path string) (model.SyncEvent, error) {
 	e := model.NewSyncEvent()
+	pathStore := store.FileHasPathStores[path]
+	fileCheck := pathStore.FileCheck
+	dirCheck := pathStore.DirCheck
 
 	dir, err := os.ReadDir(path)
 	if err != nil {
@@ -35,10 +39,10 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		if entry.IsDir() { //文件夹
 
 			currentDirHasCheck[filePath] = false //保存当前的文件夹列表
-			_, ok := model.DirHasCheck[filePath]
+			_, ok := dirCheck[filePath]
 			if ok {
 				//文件夹已经存在,标记为true
-				model.DirHasCheck[filePath] = true
+				dirCheck[filePath] = true
 				continue
 			}
 
@@ -56,10 +60,10 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 
 		currentFileHashCheck[filePath] = false //保存当前的文件列表
 
-		_, ok := model.FileHasCheck[filePath]
+		_, ok := fileCheck[filePath]
 		if ok {
 			//文件夹已经存在,标记为true
-			model.FileHasCheck[filePath] = true
+			fileCheck[filePath] = true
 		}
 
 		fileDto := model.FileDto{
@@ -69,7 +73,7 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		hash, ok := model.FileTimeHasCheck[fileDto]
 		if ok {
 			//文件已经存在，标记为true
-			model.FileHasCheck[filePath] = true
+			fileCheck[filePath] = true
 
 			currentFilePathInfos[filePath] = model.FileHashDto{
 				Path:    filePath,
@@ -96,7 +100,7 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		currentFileTimeHasCheck[fileDto] = hash
 	}
 
-	for s, b := range model.FileHasCheck {
+	for s, b := range fileCheck {
 		if !b {
 			e.PushDelFileEvent(model.HashDto{
 				Path: s,
@@ -105,14 +109,17 @@ func checkFileModEvent(path string) (model.SyncEvent, error) {
 		}
 	}
 
-	for s, b := range model.DirHasCheck {
+	for s, b := range fileCheck {
 		if !b {
 			e.PushDelDirEvent(s)
 		}
 	}
 
-	model.FileHasCheck = currentFileHashCheck
-	model.DirHasCheck = currentDirHasCheck
+	store.FileHasPathStores[path] = store.PathStore{
+		DirCheck:  currentDirHasCheck,
+		FileCheck: currentFileHashCheck,
+	}
+
 	model.FilePathInfos = currentFilePathInfos
 	model.FileTimeHasCheck = currentFileTimeHasCheck
 
