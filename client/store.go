@@ -1,6 +1,10 @@
 package main
 
-import "sync"
+import (
+	"path/filepath"
+	"strings"
+	"sync"
+)
 
 //需要同步的文件
 var (
@@ -17,5 +21,27 @@ var (
 
 	NeedCheckPathStoreMutex sync.Mutex
 	//需要检查文件变动的路径
-	NeedCheckPathStore = make(map[string]struct{})
+	NeedCheckPathStore = NeedCheckPath{}
 )
+
+type NeedCheckPath map[string]struct{}
+
+//添加需要检查的路径,路径存在包含关系时，保留大的路径
+func (p *NeedCheckPath) Push(path string) {
+	path = filepath.Join("/", path)
+	NeedCheckPathStoreMutex.Lock()
+	for s := range *p {
+		if strings.HasPrefix(path, s) {
+			delete(*p, s)
+			(*p)[path] = struct{}{}
+			NeedCheckPathStoreMutex.Unlock()
+			return
+		}
+		if strings.HasPrefix(s, path) {
+			NeedCheckPathStoreMutex.Unlock()
+			return
+		}
+	}
+	(*p)[path] = struct{}{}
+	NeedCheckPathStoreMutex.Unlock()
+}

@@ -1,10 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 func main() {
-	a := map[string]int{}
-	i, ok := a["a"]
-	fmt.Println(i, ok)
+	var s = "/asdf/dsafasfa/sadf/"
+	join := filepath.Join("/", "/sdafaf/asdfadsf/dasfas/")
+	fmt.Println(filepath.FromSlash(s))
+	fmt.Println(filepath.FromSlash(join))
 
 }

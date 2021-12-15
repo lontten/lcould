@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/lontten/lcloud/model"
 	"github.com/lontten/lcloud/store"
 	"github.com/lontten/lcloud/utils"
@@ -137,11 +138,14 @@ func doCheck() {
 		return
 	}
 	event, err := checkFileChangeEvent(path)
+	if err != nil {
+		fmt.Println(err)
+		NeedCheckPathStoreMutex.Lock()
+		NeedCheckPathStore[path] = struct{}{}
+		NeedCheckPathStoreMutex.Unlock()
+	}
 	pathMutex.Unlock()
 
-	if err != nil {
-		panic(err)
-	}
 	AddSyncEvent2LocalEvent(event)
 
 }
