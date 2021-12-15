@@ -1,5 +1,7 @@
 package main
 
+import "sync"
+
 //需要同步的文件
 var (
 	//需要从服务器拉取的文件hash
@@ -13,6 +15,7 @@ var (
 	//需要处理的从服务器拉取的event
 	LocalEventStore = make(map[string]string)
 
+	NeedCheckPathStoreMutex sync.Mutex
 	//需要检查文件变动的路径
 	NeedCheckPathStore = make(map[string]struct{})
 )

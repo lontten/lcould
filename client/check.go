@@ -6,6 +6,7 @@ import (
 	"github.com/lontten/lcloud/utils"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 //遍历文件夹，获取文件信息，生成 file 变化event
@@ -115,4 +116,32 @@ func checkFileChangeEvent(path string) (model.SyncEvent, error) {
 	store.GlobalFileTimeHashStore = currentFileTimeHasCheck
 
 	return e, nil
+}
+
+var pathMutex sync.Mutex
+var path = ""
+
+func doCheck() {
+	pathMutex.Lock()
+
+	NeedCheckPathStoreMutex.Lock()
+	if len(NeedCheckPathStore) > 0 {
+		for p := range NeedCheckPathStore {
+			path = p
+		}
+	}
+	NeedCheckPathStoreMutex.Unlock()
+
+	if path == "" {
+		pathMutex.Unlock()
+		return
+	}
+	event, err := checkFileChangeEvent(path)
+	pathMutex.Unlock()
+
+	if err != nil {
+		panic(err)
+	}
+	AddSyncEvent2LocalEvent(event)
+
 }
